@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnprocessedMessageQueueConsumerService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CodeScreen_yrnx3ahb</a> &gt; <a href="index.source.html" class="el_package">dev.codescreen.service</a> &gt; <span class="el_source">UnprocessedMessageQueueConsumerService.java</span></div><h1>UnprocessedMessageQueueConsumerService.java</h1><pre class="source lang-java linenums">package dev.codescreen.service;
+
+import dev.codescreen.exception.TransactionError;
+import dev.codescreen.exception.TransactionServiceException;
+import dev.codescreen.model.*;
+import dev.codescreen.store.ProcessedMessageStore;
+import dev.codescreen.store.UnprocessedMessageQueue;
+import dev.codescreen.store.UserStore;
+import dev.codescreen.store.entity.ProcessedMessage;
+import dev.codescreen.store.entity.UnprocessedMessage;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.PostConstruct;
+import java.time.LocalDateTime;
+
+@Service
+<span class="fc" id="L18">@Slf4j</span>
+public class UnprocessedMessageQueueConsumerService {
+
+    private final UnprocessedMessageQueue unprocessedMessageQueue;
+
+    private final ProcessedMessageStore processedMessageStore;
+
+    private final UserStore userStore;
+
+    public UnprocessedMessageQueueConsumerService(UnprocessedMessageQueue unprocessedMessageQueue,
+                                                  ProcessedMessageStore processedMessageStore,
+<span class="fc" id="L29">                                                  UserStore userStore) {</span>
+<span class="fc" id="L30">        this.unprocessedMessageQueue = unprocessedMessageQueue;</span>
+<span class="fc" id="L31">        this.processedMessageStore = processedMessageStore;</span>
+<span class="fc" id="L32">        this.userStore = userStore;</span>
+<span class="fc" id="L33">    }</span>
+
+    @PostConstruct
+    public void consumeMessages() {
+<span class="fc" id="L37">        new Thread(() -&gt; {</span>
+            while (true) {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">                if (!unprocessedMessageQueue.isEmpty()) {</span>
+<span class="fc" id="L40">                    UnprocessedMessage unprocessedMessage = unprocessedMessageQueue.dequeue();</span>
+
+//                    log.info(unprocessedMessage.getMessageId() + &quot; &quot; + unprocessedMessage.getTransactionAmount());
+
+<span class="fc" id="L44">                    Amount balance = userStore.getUser(unprocessedMessage.getUserId()).getBalance();</span>
+<span class="fc" id="L45">                    ResponseCode responseCode = null;</span>
+                    try {
+<span class="fc" id="L47">                        balance = updateFunds(unprocessedMessage);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                        if (unprocessedMessage.getTransactionAmount().getDebitOrCredit() == DebitCredit.DEBIT) {</span>
+<span class="fc" id="L49">                            responseCode = ResponseCode.APPROVED;</span>
+                        }
+<span class="fc" id="L51">                    } catch (TransactionServiceException e) {</span>
+<span class="fc" id="L52">                        e.printStackTrace();</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                        if (unprocessedMessage.getTransactionAmount().getDebitOrCredit() == DebitCredit.DEBIT) {</span>
+<span class="fc" id="L54">                            responseCode = ResponseCode.DENIED;</span>
+                        }
+<span class="fc" id="L56">                    }</span>
+
+<span class="fc" id="L58">                    ProcessedMessage processedMessage = new ProcessedMessage(</span>
+<span class="fc" id="L59">                            LocalDateTime.now(),</span>
+<span class="fc" id="L60">                            unprocessedMessage.getUserId(),</span>
+<span class="fc" id="L61">                            unprocessedMessage.getMessageId(),</span>
+<span class="fc" id="L62">                            unprocessedMessage.getTransactionAmount(),</span>
+                            responseCode,
+                            balance
+                    );
+
+<span class="fc" id="L67">                    processedMessageStore.addProcessedMessage(processedMessage.getMessageId(), processedMessage);</span>
+<span class="fc" id="L68">                }</span>
+            }
+<span class="fc" id="L70">        }).start();</span>
+<span class="fc" id="L71">    }</span>
+
+    private Amount updateFunds(UnprocessedMessage unprocessedMessage) {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (unprocessedMessage.getTransactionAmount().getDebitOrCredit() == DebitCredit.CREDIT) {</span>
+<span class="fc" id="L75">            return userStore.addToBalance(unprocessedMessage.getUserId(), unprocessedMessage.getTransactionAmount());</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        } else if (unprocessedMessage.getTransactionAmount().getDebitOrCredit() == DebitCredit.DEBIT) {</span>
+<span class="fc" id="L77">            return userStore.subtractFromBalance(unprocessedMessage.getUserId(), unprocessedMessage.getTransactionAmount());</span>
+        } else {
+<span class="nc" id="L79">            throw new TransactionServiceException(TransactionError.INVALID_TRANSACTION_TYPE);</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

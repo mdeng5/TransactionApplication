@@ -1,0 +1,7 @@
+controller\LoadControllerTest.class
+service\AuthorizationServiceTest.class
+controller\integrationtest\TransactionRecord.class
+controller\PingControllerTest.class
+controller\integrationtest\TransactionIntegrationTest.class
+controller\integrationtest\Action.class
+controller\AuthorizationControllerTest.class
